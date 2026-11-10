@@ -1,0 +1,8 @@
+{
+  "name": "LUMA — Next-Generation Live Wallpaper Platform",
+  "description": "Premium live wallpaper platform and hardware-accelerated engine for Windows 10/11 and Android with multi-monitor desktop integration, personal video studio, AI wallpaper generation, and multilingual support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,182 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoleType {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  FREE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum BillingInterval {
+  NONE
+  MONTHLY
+  ANNUAL
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  salt         String
+  displayName  String
+  language     String        @default("en")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  adminRole    AdminRole?
+  subscription Subscription?
+  favorites    Favorite[]
+  downloads    Download[]
+  reports      Report[]
+  auditLogs    AuditLog[]
+
+  @@index([email])
+}
+
+model AdminRole {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  role        RoleType @default(USER)
+  permissions String[]
+  grantedAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  slug        String      @unique
+  nameEn      String
+  nameUz      String
+  nameRu      String
+  description String
+  isPremium   Boolean     @default(false)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+
+  wallpapers  Wallpaper[]
+
+  @@index([slug])
+}
+
+model Wallpaper {
+  id              String     @id @default(uuid())
+  title           String
+  description     String
+  categoryId      String
+  resolution      String     // 1920x1080, 2560x1440, 3840x2160, 7680x4320
+  format          String     // MP4, WebM, GIF, JPG, PNG, WebP
+  durationSeconds Float      @default(10.0)
+  fileSizeMb      Float
+  videoUrl        String
+  thumbnailUrl    String
+  sha256Checksum  String
+  isPremium       Boolean    @default(false)
+  isFeatured      Boolean    @default(false)
+  isPublished     Boolean    @default(true)
+  downloadsCount  Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  category        Category   @relation(fields: [categoryId], references: [id])
+  favorites       Favorite[]
+  downloads       Download[]
+  reports         Report[]
+
+  @@index([categoryId, isPublished])
+  @@index([isPremium, isPublished])
+  @@index([downloadsCount(sort: Desc)])
+}
+
+model Favorite {
+  id          String    @id @default(uuid())
+  userId      String
+  wallpaperId String
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallpaper   Wallpaper @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wallpaperId])
+  @@index([userId])
+}
+
+model Download {
+  id             String    @id @default(uuid())
+  userId         String?
+  wallpaperId    String
+  platform       String    // WINDOWS_10, WINDOWS_11, ANDROID
+  sha256Verified Boolean   @default(true)
+  downloadedAt   DateTime  @default(now())
+
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  wallpaper      Wallpaper @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+
+  @@index([wallpaperId])
+  @@index([userId])
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  userId               String             @unique
+  status               SubscriptionStatus @default(FREE)
+  interval             BillingInterval    @default(NONE)
+  provider             String             // STRIPE, GOOGLE_PLAY, MICROSOFT_STORE
+  externalCustomerId   String?
+  externalSubId        String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  updatedAt            DateTime           @updatedAt
+
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, currentPeriodEnd])
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  wallpaperId String
+  reporterId  String?
+  reason      String
+  status      ReportStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  resolvedAt  DateTime?
+
+  wallpaper   Wallpaper    @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+  reporter    User?        @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  targetId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([actorId, createdAt(sort: Desc)])
+}
